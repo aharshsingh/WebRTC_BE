@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>WebRTC Receiver</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: #121212;
+      color: #f5f5f5;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    header {
+      width: 100%;
+      padding: 1rem;
+      text-align: center;
+      font-size: 1.5rem;
+      font-weight: bold;
+      background: #1e1e1e;
+      border-bottom: 1px solid #333;
+    }
+
+    main {
+      flex: 1;
+      position: relative;
+      background: black;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #remoteVideo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: #000;
+    }
+
+    #remotePlaceholder {
+      position: absolute;
+      font-size: 1.2rem;
+      color: #aaa;
+      text-align: center;
+    }
+
+    #localVideo {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      width: 200px;
+      border-radius: 12px;
+      border: 2px solid #444;
+      background: black;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+    }
+
+    footer {
+      padding: 1rem;
+      text-align: center;
+      background: #1e1e1e;
+      border-top: 1px solid #333;
+      font-size: 0.9rem;
+      color: #aaa;
+    }
+  </style>
+</head>
+<body>
+  <header>🎥 WebRTC Receiver</header>
+
+  <main>
+    <!-- Remote video (dummy for now) -->
+    <video id="remoteVideo" autoplay playsinline></video>
+    <div id="remotePlaceholder">👤 Waiting for remote video...</div>
+
+    <!-- Local self-view -->
+    <video id="localVideo" autoplay playsinline muted></video>
+  </main>
+
+  <footer>
+    Status: <span id="status">Connecting...</span>
+  </footer>
+
+  <script>
+    const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI5ZGZhZDk2Zi1mYWUzLTRmZjEtOWJjYi1iMmUzYjc5ZTc2N2UiLCJzZXNzaW9uSWQiOiJkZTIxMTRhNi00NTBiLTRkMTEtYTc2NC1jMWQxODczNDU1ZWEiLCJpYXQiOjE3NTc0ODIyMDgsImV4cCI6MTc1NzQ4NTgwOH0.EfftrTvQ1-UCCv1MEsF-ZHr9lPBaxQZI0Vx0FgJ3pz0";
+    const REMOTE_USER_ID = "9485634a-a620-41e4-9834-a5c980074fba";
+
+    const ws = new WebSocket(`ws://localhost:7000?token=${TOKEN}`);
+    const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+
+    const candidateQueue = [];
+    const statusEl = document.getElementById("status");
+    const remoteVideo = document.getElementById("remoteVideo");
+    const remotePlaceholder = document.getElementById("remotePlaceholder");
+    const localVideo = document.getElementById("localVideo");
+
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
+      localVideo.srcObject = stream;
+      stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+      // 👉 Make dummy remote video same as local (for now)
+      remoteVideo.srcObject = stream;
+      remotePlaceholder.style.display = "none";
+      statusEl.innerText = "Connected ✅";
+    });
+
+    pc.ontrack = (event) => {
+      console.log("Remote track received:", event.streams);
+      remoteVideo.srcObject = event.streams[0]; // replace dummy once real peer sends
+      remotePlaceholder.style.display = "none";
+      statusEl.innerText = "Connected ✅";
+    };
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        ws.send(JSON.stringify({ type: "candidate", targetUserId: REMOTE_USER_ID, payload: event.candidate }));
+      }
+    };
+
+    async function addCandidateSafely(candidate) {
+      if (pc.remoteDescription) {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } else {
+        candidateQueue.push(candidate);
+      }
+    }
+
+    ws.onopen = () => {
+      console.log("WebSocket connected (Receiver)");
+      statusEl.innerText = "Waiting for offer...";
+    };
+
+    ws.onmessage = async (event) => {
+      const msg = JSON.parse(event.data);
+      console.log("Receiver received:", msg);
+
+      if (msg.type === "offer") {
+        await pc.setRemoteDescription(new RTCSessionDescription(msg.payload));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        ws.send(JSON.stringify({ type: "answer", targetUserId: msg.from, payload: answer }));
+
+        while (candidateQueue.length) {
+          await pc.addIceCandidate(new RTCIceCandidate(candidateQueue.shift()));
+        }
+      } else if (msg.type === "candidate") {
+        await addCandidateSafely(msg.payload);
+      }
+    };
+  </script>
+</body>
+</html>

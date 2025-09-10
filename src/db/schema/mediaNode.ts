@@ -1,10 +1,10 @@
-import { pgTable, serial, varchar, integer } from "drizzle-orm/pg-core";
+import { pgTable, varchar, integer, uuid } from "drizzle-orm/pg-core";
 
 // Enum for status
 export const nodeStatusEnum = ["active", "inactive", "maintenance"] as const;
 
 export const nodes = pgTable("nodes", {
-  id: serial("id").primaryKey(),
+  id: uuid("id").primaryKey(),
   ip: varchar("ip", { length: 50 }).notNull(),
   region: varchar("region", { length: 100 }).notNull(),
   capacity: integer("capacity").notNull(), // max concurrent sessions

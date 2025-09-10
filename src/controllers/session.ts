@@ -1,45 +1,75 @@
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import { db } from "../config/db";
 import { sessions } from "../db/schema";
 import { eq } from "drizzle-orm";
+import { v4 as uuidv4 } from "uuid";
 
 export const SessionController = {
-    createSession: async (req: Request, res: Response) => {
-        const { orgId, createdBy, participantIds, type } = req.body;
+    createSession: async (req: Request, res: Response, next: NextFunction) => {
+        const { org, createdBy, type } = req.body;
 
         try {
             const newSession = await db.insert(sessions).values({
-                orgId,
+                id: uuidv4(),
+                org,
                 createdBy,
-                participants: participantIds,
                 type,
                 status: "pending",
             }).returning();
 
             res.json(newSession[0]);
         } catch (err) {
-            res.status(500).json({ error: "Failed to create session" });
+            return next(err);
         }
     },
 
-    updateSessionStatus: async (req: Request, res: Response) => {
+    updateSession: async (req: Request, res: Response, next: NextFunction) => {
         const { sessionId } = req.params;
-        const { status } = req.body;
+        const { status, participantId } = req.body;
 
         try {
+            // Fetch current session
+            const [existingSession] = await db
+                .select()
+                .from(sessions)
+                .where(eq(sessions.id, sessionId));
 
-            const updated = await db
+            if (!existingSession) {
+                return res.status(404).json({ error: "Session not found" });
+            }
+
+            // Start with old values
+            const updates: any = {};
+
+            // Update status if provided
+            if (status) {
+                updates.status = status;
+            }
+
+            // Add participant if provided
+            if (participantId) {
+                const currentParticipants = Array.isArray(existingSession.participants)
+                    ? existingSession.participants
+                    : [];
+
+                updates.participants = [...currentParticipants, participantId];
+            }
+
+            // Perform update
+            const [updated] = await db
                 .update(sessions)
-                .set({ status })
-                .where(eq(sessions.id, Number(sessionId)))
+                .set(updates)
+                .where(eq(sessions.id, sessionId))
                 .returning();
-            res.json(updated[0]);
+
+            res.json(updated);
         } catch (err) {
-            res.status(500).json({ error: "Failed to update session" });
+            console.error(err);
+            return next(err);
         }
     },
 
-    getSessionById: async (req: Request, res: Response) => {
+    getSessionById: async (req: Request, res: Response, next: NextFunction) => {
         const { sessionId } = req.params;
 
         try {
@@ -47,12 +77,12 @@ export const SessionController = {
             const session = await db
                 .select()
                 .from(sessions)
-                .where(eq(sessions.id, Number(sessionId)));
+                .where(eq(sessions.id, sessionId));
             if (!session.length) return res.status(404).json({ error: "Session not found" });
 
             res.json(session[0]);
         } catch (err) {
-            res.status(500).json({ error: "Failed to fetch session" });
+            return next(err);
         }
     },
 };

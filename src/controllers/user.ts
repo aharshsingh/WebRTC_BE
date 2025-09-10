@@ -1,16 +1,17 @@
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import { db } from "../config/db";
 import { users } from "../db/schema";
 import { eq } from "drizzle-orm";
+import { sendResponse } from "../utils/response";
 
-export const UserController = {
+const UserController = {
     // Create internal user
-    createInternalUser: async (req: Request, res: Response) => {
-        const { orgId, name, email, phone, role } = req.body;
+    createInternalUser: async (req: Request, res: Response, next: NextFunction) => {
+        const { org, name, email, phone, role } = req.body;
 
         try {
             const newUser = await db.insert(users).values({
-                orgId,
+                org,
                 name,
                 email,
                 phone,
@@ -19,13 +20,14 @@ export const UserController = {
             }).returning();
 
             res.json(newUser[0]);
+            sendResponse(res, "Internal user created successfully", newUser[0], "CREATED");
         } catch (err) {
-            res.status(500).json({ error: "Failed to create user" });
+            return next(err);
         }
     },
 
     // Create external user (placeholder)
-    createExternalUser: async (req: Request, res: Response) => {
+    createExternalUser: async (req: Request, res: Response, next: NextFunction) => {
         const { name, email, phone } = req.body;
 
         try {
@@ -38,13 +40,14 @@ export const UserController = {
             }).returning();
 
             res.json(newUser[0]);
+            sendResponse(res, "External user created successfully", newUser[0], "CREATED");
         } catch (err) {
-            res.status(500).json({ error: "Failed to create external user" });
+            return next(err);
         }
     },
 
     // Get user by ID
-    getUserById: async (req: Request, res: Response) => {
+    getUserById: async (req: Request, res: Response, next: NextFunction) => {
         const { id } = req.params;
 
         try {
@@ -52,11 +55,14 @@ export const UserController = {
                 .select()
                 .from(users)
                 .where(eq(users.id, id));
-            if (!user.length) return res.status(404).json({ error: "User not found" });
+            if (!user.length) res.status(404).json({ error: "User not found" });
 
             res.json(user[0]);
+            sendResponse(res, "Fetched user", user[0], "SUCCESS");
         } catch (err) {
-            res.status(500).json({ error: "Failed to fetch user" });
+            return next(err);
         }
     },
 };
+
+export default UserController;

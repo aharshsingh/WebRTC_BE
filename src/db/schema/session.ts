@@ -1,21 +1,21 @@
-import { pgTable, serial, integer, timestamp, varchar, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, jsonb, timestamp, uuid, pgEnum } from "drizzle-orm/pg-core";
 import { organisations } from "./organisation";
 import { users } from "./users";
 
-export const sessionTypeEnum = ["kyc", "interview", "consult", "support"] as const;
-export const sessionStatusEnum = ["pending", "active", "completed", "failed"] as const;
+export const sessionTypeEnum = pgEnum("session_type", ["kyc", "interview", "consult", "support"]);
+export const sessionStatusEnum = pgEnum("session_status", ["pending", "active", "completed", "failed"]);
 
 export const sessions = pgTable("sessions", {
-  id: serial("id").primaryKey(),
-  orgId: integer("org_id")
+  id: uuid("id").primaryKey(),
+  org: uuid("org")
     .notNull()
     .references(() => organisations.id, { onDelete: "cascade" }),
-  createdBy: integer("created_by")
+  createdBy: uuid("created_by")
     .notNull()
     .references(() => users.id, { onDelete: "set null" }),
   participants: jsonb("participants").default([]),
-  type: varchar("type", { length: 50 }).notNull(),
-  status: varchar("status", { length: 50 }).default("pending").notNull(), // enum
+  type: sessionTypeEnum("type").notNull(),
+  status: sessionStatusEnum("status").default("pending").notNull(),
   startedAt: timestamp("started_at"),
   endedAt: timestamp("ended_at"),
 });

@@ -1,10 +1,11 @@
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import jwt from "../services/jwt";
 import redisClient from "../config/redis";
+import { sendResponse } from "../utils/response";
 
-export const TokenController = {
+const TokenController = {
   // Issue token for a participant
-  issueToken: async (req: Request, res: Response) => {
+   async issueToken (req: Request, res: Response, next: NextFunction) {
     const { userId, sessionId, expiresIn = "1h" } = req.body;
 
     try {
@@ -26,15 +27,15 @@ export const TokenController = {
         JSON.stringify({ userId, sessionId })
       );
 
-      res.json({ token, expiresIn });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Failed to issue token" });
+      sendResponse(res, "Token generated successfully", { token, expiresIn }, "CREATED");
+    } catch (error) {
+      console.error(error);
+      return next(error);
     }
   },
 
   // Revoke token
-  revokeToken: async (req: Request, res: Response) => {
+  async revokeToken (req: Request, res: Response, next: NextFunction) {
     const { token } = req.params;
 
     try {
@@ -42,31 +43,33 @@ export const TokenController = {
       const result = await redisClient.del(`accessToken:${token}`);
 
       if (result === 0) {
-        return res.status(404).json({ error: "Token not found" });
+        res.status(404).json({ error: "Token not found" });
       }
 
-      res.json({ success: true, revoked: token });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Failed to revoke token" });
+      sendResponse(res, "Token revoked successfully", { success: true, revoked: token }, "UPDATED");
+    } catch (error) {
+      console.error(error);
+      return next(error);
     }
   },
 
   // Validate token
-  validateToken: async (req: Request, res: Response) => {
+  async validateToken (req: Request, res: Response, next: NextFunction) {
     const { token } = req.body;
 
     try {
       const data = await redisClient.get(`accessToken:${token}`);
 
       if (!data) {
-        return res.status(401).json({ error: "Invalid or expired token" });
+        res.status(401).json({ error: "Invalid or expired token" });
       }
 
-      res.json({ valid: true, data: JSON.parse(data) });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Failed to validate token" });
+      sendResponse(res, "Token is valid", { valid: true, data: JSON.parse(data || "") }, "SUCCESS");
+    } catch (error) {
+      console.error(error);
+      return next(error);
     }
   },
 };
+
+export default TokenController;

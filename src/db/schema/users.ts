@@ -6,7 +6,7 @@ export const userStatuses = pgEnum("user_statuses", ["active", "pending", "inact
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
-  orgId: uuid("org_id")
+  org: uuid("org")
     .references(() => organisations.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }),
   email: varchar("email", { length: 255 }),

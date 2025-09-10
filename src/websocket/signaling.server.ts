@@ -22,10 +22,8 @@ export function startSignalingServer(server: any) {
     }
 
     try {
-      // Validate JWT
       const payload: any = jwt.verifyToken(token);
 
-      // Check Redis for revocation
       const redisKey = `accessToken:${token}`;
       const tokenData = await redisClient.get(redisKey);
 
@@ -67,11 +65,14 @@ export function startSignalingServer(server: any) {
 
 function handleSignalMessage(sessionId: string, senderId: string, data: any) {
   const { targetUserId, type, payload } = data;
-  const targetKey = `${sessionId}:${targetUserId}`;
+  console.log(`Signal message from ${senderId} to ${targetUserId}:`, type);
 
+  const targetKey = `${sessionId}:${targetUserId}`;
   if (clients[targetKey]) {
     clients[targetKey].socket.send(
       JSON.stringify({ from: senderId, type, payload })
     );
+  } else {
+    console.log(`Target ${targetUserId} not connected yet.`);
   }
 }
