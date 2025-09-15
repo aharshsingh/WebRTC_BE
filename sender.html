@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <title>WebRTC Receiver</title>
@@ -56,7 +57,7 @@
       border-radius: 12px;
       border: 2px solid #444;
       background: black;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
     }
 
     footer {
@@ -89,6 +90,7 @@
     }
   </style>
 </head>
+
 <body>
   <header>📞 WebRTC Sender</header>
 
@@ -102,7 +104,6 @@
     <button id="startBtn">Start Call</button>
     <button id="endBtn" disabled>End Call</button>
   </footer>
-
   <script>
     const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI5NDg1NjM0YS1hNjIwLTQxZTQtOTgzNC1hNWM5ODAwNzRmYmEiLCJzZXNzaW9uSWQiOiJkZTIxMTRhNi00NTBiLTRkMTEtYTc2NC1jMWQxODczNDU1ZWEiLCJpYXQiOjE3NTc0ODIyMDgsImV4cCI6MTc1NzQ4OTQwOH0.ZvS9F2YchMvYPI6V8uODR_JKTV_Q0uifn5Q9Fwkj6ig";
     const REMOTE_USER_ID = "9dfad96f-fae3-4ff1-9bcb-b2e3b79e767e";
@@ -125,12 +126,16 @@
 
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       localVideo.srcObject = stream;
-
-      // 🔹 Show local video also in the big screen as dummy until real remote stream comes
-      remoteVideo.srcObject = stream;
-      remotePlaceholder.style.display = "none";
-
       stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+      // 🔹 Wait 3 seconds before showing dummy remote
+      setTimeout(() => {
+        if (!remoteVideo.srcObject) {
+          remoteVideo.srcObject = stream;
+          remotePlaceholder.style.display = "none";
+          console.log("Dummy remote stream shown (self-view)");
+        }
+      }, 3000);
 
       pc.ontrack = (event) => {
         console.log("Remote track received:", event.streams);
@@ -145,7 +150,7 @@
       };
 
       ws.onopen = () => {
-        console.log("WebSocket connected (Receiver)");
+        console.log("WebSocket connected (Sender)");
       };
 
       async function addCandidateSafely(candidate) {
@@ -158,7 +163,7 @@
 
       ws.onmessage = async (event) => {
         const msg = JSON.parse(event.data);
-        console.log("Receiver received:", msg);
+        console.log("Sender received:", msg);
 
         if (msg.type === "offer") {
           await pc.setRemoteDescription(new RTCSessionDescription(msg.payload));
@@ -193,4 +198,5 @@
     };
   </script>
 </body>
+
 </html>

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <title>WebRTC Receiver</title>
@@ -56,7 +57,7 @@
       border-radius: 12px;
       border: 2px solid #444;
       background: black;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
     }
 
     footer {
@@ -69,6 +70,7 @@
     }
   </style>
 </head>
+
 <body>
   <header>🎥 WebRTC Receiver</header>
 
@@ -102,17 +104,22 @@
       localVideo.srcObject = stream;
       stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
-      // 👉 Make dummy remote video same as local (for now)
-      remoteVideo.srcObject = stream;
-      remotePlaceholder.style.display = "none";
-      statusEl.innerText = "Connected ✅";
+      // 👉 Wait 3 seconds before showing dummy remote video
+      setTimeout(() => {
+        // only apply dummy if still no remote stream
+        if (!remoteVideo.srcObject) {
+          remoteVideo.srcObject = stream;
+          remotePlaceholder.style.display = "none";
+          statusEl.innerText = "Connected ✅ (dummy)";
+        }
+      }, 3000);
     });
 
     pc.ontrack = (event) => {
       console.log("Remote track received:", event.streams);
       remoteVideo.srcObject = event.streams[0]; // replace dummy once real peer sends
       remotePlaceholder.style.display = "none";
-      statusEl.innerText = "Connected ✅";
+      statusEl.innerText = "Connected ✅ (real)";
     };
 
     pc.onicecandidate = (event) => {
@@ -153,4 +160,5 @@
     };
   </script>
 </body>
+
 </html>
